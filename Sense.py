@@ -73,6 +73,7 @@ class Sense:
         middle_tip = landmarks.landmark[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_TIP]
         ring_tip = landmarks.landmark[mp.solutions.hands.HandLandmark.RING_FINGER_TIP]
         pinky_tip = landmarks.landmark[mp.solutions.hands.HandLandmark.PINKY_TIP]
+        pinky_base = landmarks.landmark[mp.solutions.hands.HandLandmark.PINKY_MCP]
 
         def distance(landmark1, landmark2):
             return np.sqrt((landmark1.x - landmark2.x) ** 2 + (landmark1.y - landmark2.y) ** 2)
@@ -83,18 +84,22 @@ class Sense:
         dist_middle = distance(thumb_tip, middle_tip)
         dist_ring = distance(thumb_tip, ring_tip)
         dist_pinky = distance(thumb_tip, pinky_tip)
+        dist_pinky = distance(thumb_tip, pinky_tip)
+        dist_pinky_mcp = distance(thumb_tip, pinky_base)
 
         # Check if each finger is touching the thumb
         touch_index = dist_index < threshold
         touch_middle = dist_middle < threshold
         touch_ring = dist_ring < threshold
         touch_pinky = dist_pinky < threshold
+        touch_pinky_mcp = dist_pinky_mcp < threshold
 
         return {
             "thumb_to_index": touch_index,
             "thumb_to_middle": touch_middle,
             "thumb_to_ring": touch_ring,
-            "thumb_to_pinky": touch_pinky
+            "thumb_to_pinky": touch_pinky,
+            "thumb_to_pinky_mcp": touch_pinky_mcp   
         }
 
     def extract_finger_open_close(self, landmarks):
@@ -124,9 +129,27 @@ class Sense:
             open_fingers[finger] = dist > open_threshold  # True if finger is open
 
         return open_fingers
+    
+    def extract_finger_to_wrist(self, landmarks):
+        wrist = landmarks.landmark[mp.solutions.hands.HandLandmark.WRIST]
+        thumb_tip = landmarks.landmark[mp.solutions.hands.HandLandmark.THUMB_TIP]
+        index_tip = landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP]
+        middle_tip = landmarks.landmark[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_TIP]
+        ring_tip = landmarks.landmark[mp.solutions.hands.HandLandmark.RING_FINGER_TIP]
+        pinky_tip = landmarks.landmark[mp.solutions.hands.HandLandmark.PINKY_TIP]
+
+        def distance(landmark1, landmark2):
+            return np.sqrt((landmark1.x - landmark2.x) ** 2 + (landmark1.y - landmark2.y) ** 2)
+        
+        wrist_threshold = 0.15
+
+        fingers_to_wrist = distance(thumb_tip, wrist) < wrist_threshold and distance(index_tip, wrist) < wrist_threshold and distance(middle_tip, wrist) < wrist_threshold and distance(ring_tip, wrist) < wrist_threshold and distance(pinky_tip, wrist) < wrist_threshold
+        return fingers_to_wrist
 
     def extract_hand_movements(self, landmarks):
         """Returns a dictionary of detected hand movements (touching thumb, fingers open/closed)."""
         finger_touch = self.extract_finger_touch(landmarks)
         finger_open_close = self.extract_finger_open_close(landmarks)
-        return {**finger_touch, **finger_open_close}
+        fingers_to_wrist = self.extract_finger_to_wrist(landmarks)
+        return {**finger_touch, **finger_open_close, "fingers_to_wrist": fingers_to_wrist}
+  
