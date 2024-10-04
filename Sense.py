@@ -2,55 +2,51 @@ import cv2
 import mediapipe as mp
 import math
 import numpy as np
-import mediapipe as mp
 
 
-# Sense Component: Detect joints using the camera
-# Things you need to improve: Make the skeleton tracking smoother and robust to errors.
 class Sense:
 
     def __init__(self):
-        # Initialize the Mediapipe Pose object to track joints
-
+        # Initialize the Mediapipe Pose and Hand objects to track joints
         self.mp_drawing = mp.solutions.drawing_utils
         self.mp_pose = mp.solutions.pose.Pose()
         self.mp_hands = mp.solutions.hands.Hands()
 
-        # used later for having a moving avergage
-        self.angle_window = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
-        self.previous_angle = -1
+        # For smoothing angles and distances, keep a window for moving average
+        self.angle_window = [-1] * 10
+        self.distance_window = [-1] * 10
 
     def detect_joints(self, frame):
+        """Detect pose joints (skeleton tracking)."""
         results = self.mp_pose.process(frame)
         return results if results else None
 
     def detect_hands(self, frame):
+        """Detect hand joints and landmarks."""
         results = self.mp_hands.process(frame)
         return results if results else None
 
     def calculate_angle(self, joint1, joint2, joint3):
-        # Calculate vectors
+        """Calculate the angle between three joints (vectors)."""
         vector1 = [joint1[0] - joint2[0], joint1[1] - joint2[1]]
         vector2 = [joint3[0] - joint2[0], joint3[1] - joint2[1]]
 
-        # Calculate the dot product and magnitude of the vectors
         dot_product = vector1[0] * vector2[0] + vector1[1] * vector2[1]
         magnitude1 = math.sqrt(vector1[0] ** 2 + vector1[1] ** 2)
         magnitude2 = math.sqrt(vector2[0] ** 2 + vector2[1] ** 2)
 
-        # Calculate the angle in radians and convert to degrees
         angle = math.acos(dot_product / (magnitude1 * magnitude2))
 
-        # get a moving average
+        # Moving average for smoothing the angle
         self.angle_window.pop(0)
         self.angle_window.append(angle)
-        # Use np.convolve to calculate the moving average
         window_size = 10
         angle_mvg = np.convolve(np.asarray(self.angle_window), np.ones(window_size) / window_size, mode='valid')
 
-        return math.degrees(angle_mvg)
+        return math.degrees(angle_mvg[0])
 
     def extract_joint_coordinates(self, landmarks, joint):
+        """Extract coordinates of a specified joint."""
         joint_index_map = {
             'left_shoulder': mp.solutions.pose.PoseLandmark.LEFT_SHOULDER,
             'right_shoulder': mp.solutions.pose.PoseLandmark.RIGHT_SHOULDER,
@@ -70,81 +66,67 @@ class Sense:
 
         return landmark.x, landmark.y
 
-        # Example for defining a function that extracts an angle
+    def extract_finger_touch(self, landmarks):
+        """Check if each finger touches the thumb."""
+        thumb_tip = landmarks.landmark[mp.solutions.hands.HandLandmark.THUMB_TIP]
+        index_tip = landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP]
+        middle_tip = landmarks.landmark[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_TIP]
+        ring_tip = landmarks.landmark[mp.solutions.hands.HandLandmark.RING_FINGER_TIP]
+        pinky_tip = landmarks.landmark[mp.solutions.hands.HandLandmark.PINKY_TIP]
 
-    def extract_hip_angle(self, landmarks):
-        left_hip = [landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_HIP.value].x,
-                    landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_HIP.value].y]
-        left_shoulder = [landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_SHOULDER.value].x,
-                         landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_SHOULDER.value].y]
-        left_knee = [landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_KNEE.value].x,
-                     landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_KNEE.value].y]
-        return self.calculate_angle(left_shoulder, left_hip, left_knee)
+        def distance(landmark1, landmark2):
+            return np.sqrt((landmark1.x - landmark2.x) ** 2 + (landmark1.y - landmark2.y) ** 2)
 
-        # Extracts the angle of the knee
+        # Smoothed distance using moving average
+        threshold = 0.05
+        dist_index = distance(thumb_tip, index_tip)
+        dist_middle = distance(thumb_tip, middle_tip)
+        dist_ring = distance(thumb_tip, ring_tip)
+        dist_pinky = distance(thumb_tip, pinky_tip)
 
-    def extract_knee_angle(self, landmarks):
-        left_hip = [landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_HIP.value].x,
-                    landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_HIP.value].y]
-        left_knee = [landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_KNEE.value].x,
-                     landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_KNEE.value].y]
-        left_ankle = [landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_ANKLE.value].x,
-                      landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_ANKLE.value].y]
-        return self.calculate_angle(left_hip, left_knee, left_ankle)
-
-        # Function to extract hand coordinates (including fingers)
-
-    def extract_hand_coordinates(self, landmarks):
-        hand_coords = {
-            'wrist': [landmarks.landmark[mp.solutions.hands.HandLandmark.WRIST].x,
-                      landmarks.landmark[mp.solutions.hands.HandLandmark.WRIST].y],
-            'thumb_mcp': [landmarks.landmark[mp.solutions.hands.HandLandmark.THUMB_MCP].x,
-                          landmarks.landmark[mp.solutions.hands.HandLandmark.THUMB_MCP].y],
-            'thumb_tip': [landmarks.landmark[mp.solutions.hands.HandLandmark.THUMB_TIP].x,
-                          landmarks.landmark[mp.solutions.hands.HandLandmark.THUMB_TIP].y],
-            'index_mcp': [landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_MCP].x,
-                          landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_MCP].y],
-            'index_tip': [landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP].x,
-                          landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP].y],
-            # Add more fingers as needed
-        }
-        return hand_coords
-
-    # Function to calculate the angles for hand joints/fingers
-    def extract_hand_angles(self, landmarks):
-        wrist = [landmarks.landmark[mp.solutions.hands.HandLandmark.WRIST].x,
-                 landmarks.landmark[mp.solutions.hands.HandLandmark.WRIST].y]
-        thumb_mcp = [landmarks.landmark[mp.solutions.hands.HandLandmark.THUMB_MCP].x,
-                     landmarks.landmark[mp.solutions.hands.HandLandmark.THUMB_MCP].y]
-        thumb_tip = [landmarks.landmark[mp.solutions.hands.HandLandmark.THUMB_TIP].x,
-                     landmarks.landmark[mp.solutions.hands.HandLandmark.THUMB_TIP].y]
-        index_mcp = [landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_MCP].x,
-                     landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_MCP].y]
-        index_tip = [landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP].x,
-                     landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP].y]
-        middle_mcp = [landmarks.landmark[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_MCP].x,
-                      landmarks.landmark[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_MCP].y]
-        middle_tip = [landmarks.landmark[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_TIP].x,
-                      landmarks.landmark[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_TIP].y]
-        ring_mcp = [landmarks.landmark[mp.solutions.hands.HandLandmark.RING_FINGER_MCP].x,
-                    landmarks.landmark[mp.solutions.hands.HandLandmark.RING_FINGER_MCP].y]
-        ring_tip = [landmarks.landmark[mp.solutions.hands.HandLandmark.RING_FINGER_TIP].x,
-                    landmarks.landmark[mp.solutions.hands.HandLandmark.RING_FINGER_TIP].y]
-        pinky_mcp = [landmarks.landmark[mp.solutions.hands.HandLandmark.PINKY_MCP].x,
-                    landmarks.landmark[mp.solutions.hands.HandLandmark.PINKY_MCP].y]
-        pinky_tip = [landmarks.landmark[mp.solutions.hands.HandLandmark.PINKY_TIP].x,
-                    landmarks.landmark[mp.solutions.hands.HandLandmark.PINKY_TIP].y]
-
-        thumb_angle = self.calculate_angle(wrist, thumb_mcp, thumb_tip)
-        index_angle = self.calculate_angle(wrist, index_mcp, index_tip)
-        middle_angle = self.calculate_angle(wrist, middle_mcp, middle_tip)
-        ring_angle = self.calculate_angle(wrist, ring_mcp, ring_tip)
-        pinky_angle = self.calculate_angle(wrist, pinky_mcp, pinky_tip)
+        # Check if each finger is touching the thumb
+        touch_index = dist_index < threshold
+        touch_middle = dist_middle < threshold
+        touch_ring = dist_ring < threshold
+        touch_pinky = dist_pinky < threshold
 
         return {
-            'thumb_angle': thumb_angle,
-            'index_angle': index_angle,
-            'middle_angle': middle_angle,
-            'ring_angle': ring_angle,
-            'pinky_angle': pinky_angle
+            "thumb_to_index": touch_index,
+            "thumb_to_middle": touch_middle,
+            "thumb_to_ring": touch_ring,
+            "thumb_to_pinky": touch_pinky
         }
+
+    def extract_finger_open_close(self, landmarks):
+        """Detect if fingers are open or closed by comparing distances."""
+
+        def distance(landmark1, landmark2):
+            return np.sqrt((landmark1.x - landmark2.x) ** 2 + (landmark1.y - landmark2.y) ** 2)
+
+        # Get tip and base (MCP) landmarks for each finger
+        fingers = {
+            "index": (landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP],
+                      landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_MCP]),
+            "middle": (landmarks.landmark[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_TIP],
+                       landmarks.landmark[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_MCP]),
+            "ring": (landmarks.landmark[mp.solutions.hands.HandLandmark.RING_FINGER_TIP],
+                     landmarks.landmark[mp.solutions.hands.HandLandmark.RING_FINGER_MCP]),
+            "pinky": (landmarks.landmark[mp.solutions.hands.HandLandmark.PINKY_TIP],
+                      landmarks.landmark[mp.solutions.hands.HandLandmark.PINKY_MCP])
+        }
+
+        open_fingers = {}
+        close_threshold = 0.05  # Adjust this threshold based on distance
+        open_threshold = 0.15
+
+        for finger, (tip, base) in fingers.items():
+            dist = distance(tip, base)
+            open_fingers[finger] = dist > open_threshold  # True if finger is open
+
+        return open_fingers
+
+    def extract_hand_movements(self, landmarks):
+        """Returns a dictionary of detected hand movements (touching thumb, fingers open/closed)."""
+        finger_touch = self.extract_finger_touch(landmarks)
+        finger_open_close = self.extract_finger_open_close(landmarks)
+        return {**finger_touch, **finger_open_close}
