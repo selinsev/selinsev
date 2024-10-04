@@ -7,12 +7,14 @@ class Think:
 
         # Define movement expectations
         self.movement_expectations = {
+            "Touch Thumb to the base of pinky": lambda movements: movements['thumb_to_pinky_mcp'],
             "Touch Thumb with Index": lambda movements: movements['thumb_to_index'],
             "Touch Thumb with Middle": lambda movements: movements['thumb_to_middle'],
             "Touch Thumb with Ring": lambda movements: movements['thumb_to_ring'],
             "Touch Thumb with Pinky": lambda movements: movements['thumb_to_pinky'],
             "Open All Fingers": lambda movements: all(movements[finger] for finger in ['index', 'middle', 'ring', 'pinky']),
-            "Close All Fingers": lambda movements: not any(movements[finger] for finger in ['index', 'middle', 'ring', 'pinky'])
+            "Close All Fingers": lambda movements: not any(movements[finger] for finger in ['index', 'middle', 'ring', 'pinky']),
+            "Move Wrist (Fingers to the wrist)": lambda movements: movements['fingers_to_wrist'] 
         }
 
     def set_instruction(self, instruction):
@@ -25,7 +27,13 @@ class Think:
         """
         Update the state based on the detected hand movements.
         """
-        if self.current_instruction == "Touch Index":
+        if self.current_instruction == "Touch Thumb to the base of pinky":
+            if hand_movements["thumb_to_pinky_mcp"]:
+                self.state = "Correct: Touching Pinky Base"
+            else:
+                self.state = "Incorrect: Not Touching Pinky Base"
+        
+        elif self.current_instruction == "Touch Index":
             if hand_movements["thumb_to_index"]:
                 self.state = "Correct: Touching Index"
             else:
@@ -60,6 +68,12 @@ class Think:
                 self.state = "Correct: Fingers Closed"
             else:
                 self.state = "Incorrect: Fingers Not Closed"
+
+        elif self.current_instruction == "Move Wrist (Fingers to the wrist)":
+            if hand_movements["fingers_to_wrist"]:
+                self.state = "Correct: Fingers to Wrist"
+            else:
+                self.state = "Incorrect: Fingers Not to Wrist"
 
         else:
             self.state = "No Movement Instruction Given"
