@@ -33,43 +33,78 @@ def main():
             print("Failed to grab frame")
             break
 
+        mp_drawing = mp.solutions.drawing_utils
+        mp_drawing_styles = mp.solutions.drawing_styles
+        mp_hands = mp.solutions.hands
+        hands = mp_hands.Hands()
         # Sense: Detect joints
         joints = sense.detect_joints(frame)
-        landmarks = joints.pose_landmarks
+        results = hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        # landmarks = joints.pose_landmarks
+        #
+        # # If landmarks are detected, calculate the elbow angle
+        # if landmarks:
+        #     # Extract joint coordinates for the left arm
+        #     # For this example, we will use specific landmark indexes for shoulder, elbow, and wrist
+        #     # shoulder = sense.extract_joint_coordinates(landmarks, 'left_shoulder')
+        #     elbow = sense.extract_joint_coordinates(landmarks, 'right_elbow')
+        #     index = sense.extract_joint_coordinates(landmarks, 'right_index')
+        #     wrist = sense.extract_joint_coordinates(landmarks, 'right_wrist')
+        #
+        #
+        #     # Calculate the hand angle
+        #     hand_angle_mvg = sense.calculate_angle(elbow, wrist, index)
+        #
+        #     # Think: Next, give the angles to the decision-making component and make decisions based on joint data
+        #     think.update_state(hand_angle_mvg, sense.previous_angle)
+        #
+        #     # We'll save the previous angle for later comparison
+        #     sense.previous_angle = hand_angle_mvg
+        #
+        #     decision = think.state
+        #
+        #     # Act: Provide feedback to the user.
+        #     act.provide_feedback(decision, frame=frame, joints=joints, elbow_angle_mvg=hand_angle_mvg)
+        #     # Render the balloon visualization
+        #     # act.visualize_balloon()
+        #
+        #     # think.check_for_timeout()
 
-        # If landmarks are detected, calculate the elbow angle
-        if landmarks:
-            # Extract joint coordinates for the left arm
-            # For this example, we will use specific landmark indexes for shoulder, elbow, and wrist
-            shoulder = sense.extract_joint_coordinates(landmarks, 'left_shoulder')
-            elbow = sense.extract_joint_coordinates(landmarks, 'left_elbow')
-            wrist = sense.extract_joint_coordinates(landmarks, 'left_wrist')
 
-            # Calculate the elbow angle
-            elbow_angle_mvg = sense.calculate_angle(shoulder, elbow, wrist)
 
-            # Think: Next, give the angles to the decision-making component and make decisions based on joint data
-            think.update_state(elbow_angle_mvg, sense.previous_angle)
+        # To improve performance, optionally mark the image as not writeable to
+        # pass by reference.
+        frame.flags.writeable = False
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = hands.process(frame)
 
-            # We'll save the previous angle for later comparison
-            sense.previous_angle = elbow_angle_mvg
-
-            decision = think.state
-
-            # Act: Provide feedback to the user.
-            act.provide_feedback(decision, frame=frame, joints=joints, elbow_angle_mvg=elbow_angle_mvg)
-            # Render the balloon visualization
-            act.visualize_balloon()
-
-            # think.check_for_timeout()
+        # Draw the hand annotations on the image.
+        frame.flags.writeable = True
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        if results.multi_hand_landmarks:
+            for hand_landmarks in results.multi_hand_landmarks:
+                mp_drawing.draw_landmarks(
+                    frame,
+                    hand_landmarks,
+                    mp_hands.HAND_CONNECTIONS,
+                    mp_drawing_styles.get_default_hand_landmarks_style(),
+                    mp_drawing_styles.get_default_hand_connections_style())
+        # Flip the image horizontally for a selfie-view display.
+        cv2.imshow('MediaPipe Hands', cv2.flip(frame, 1))
 
         # Exit if the 'q' key is pressed
         if cv2.waitKey(10) & 0xFF == ord('q'):
             break
 
+
     # Release the webcam and close all OpenCV windows
     cap.release()
     cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    main()
+
 
 
 if __name__ == "__main__":
