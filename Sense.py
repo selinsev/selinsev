@@ -2,6 +2,7 @@ import cv2
 import mediapipe as mp
 import math
 import numpy as np
+import mediapipe as mp
 
 
 # Sense Component: Detect joints using the camera
@@ -13,6 +14,7 @@ class Sense:
 
         self.mp_drawing = mp.solutions.drawing_utils
         self.mp_pose = mp.solutions.pose.Pose()
+        self.mp_hands = mp.solutions.hands.Hands()
 
         # used later for having a moving avergage
         self.angle_window = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
@@ -22,18 +24,11 @@ class Sense:
         results = self.mp_pose.process(frame)
         return results if results else None
 
+    def detect_hands(self, frame):
+        results = self.mp_hands.process(frame)
+        return results if results else None
+
     def calculate_angle(self, joint1, joint2, joint3):
-        """
-        Calculates the angle between three joints.
-
-        Parameters:
-        - joint1: Tuple of (x, y) for the first joint (e.g., shoulder)
-        - joint2: Tuple of (x, y) for the middle joint (e.g., elbow)
-        - joint3: Tuple of (x, y) for the last joint (e.g., wrist)
-
-        Returns:
-        - Angle in degrees between the three joints
-        """
         # Calculate vectors
         vector1 = [joint1[0] - joint2[0], joint1[1] - joint2[1]]
         vector2 = [joint3[0] - joint2[0], joint3[1] - joint2[1]]
@@ -56,16 +51,6 @@ class Sense:
         return math.degrees(angle_mvg)
 
     def extract_joint_coordinates(self, landmarks, joint):
-        """
-        Extracts the (x, y) coordinates of a specific joint.
-
-        Parameters:
-        - landmarks: The list of pose landmarks from MediaPipe
-        - joint: The name of the joint (e.g., 'left_elbow')
-
-        Returns:
-        - A tuple of (x, y) coordinates of the specified joint
-        """
         joint_index_map = {
             'left_shoulder': mp.solutions.pose.PoseLandmark.LEFT_SHOULDER,
             'right_shoulder': mp.solutions.pose.PoseLandmark.RIGHT_SHOULDER,
@@ -73,36 +58,21 @@ class Sense:
             'right_elbow': mp.solutions.pose.PoseLandmark.RIGHT_ELBOW,
             'left_wrist': mp.solutions.pose.PoseLandmark.LEFT_WRIST,
             'right_wrist': mp.solutions.pose.PoseLandmark.RIGHT_WRIST,
-            'right_thumb': mp.solutions.pose.PoseLandmark.RIGHT_THUMB,
-            'left_thumb': mp.solutions.pose.PoseLandmark.LEFT_THUMB,
-            'right_index': mp.solutions.pose.PoseLandmark.RIGHT_INDEX,
-            'left_index': mp.solutions.pose.PoseLandmark.LEFT_INDEX,
-
             'left_hip': mp.solutions.pose.PoseLandmark.LEFT_HIP,
             'right_hip': mp.solutions.pose.PoseLandmark.RIGHT_HIP,
             'left_knee': mp.solutions.pose.PoseLandmark.LEFT_KNEE,
             'right_knee': mp.solutions.pose.PoseLandmark.RIGHT_KNEE,
             'left_ankle': mp.solutions.pose.PoseLandmark.LEFT_ANKLE,
-            'right_ankle': mp.solutions.pose.PoseLandmark.RIGHT_ANKLE
+            'right_ankle': mp.solutions.pose.PoseLandmark.RIGHT_ANKLE,
         }
-
         joint_index = joint_index_map[joint]
         landmark = landmarks.landmark[joint_index]
 
         return landmark.x, landmark.y
 
-    ### Example for defining a function that extracts an angle
+        # Example for defining a function that extracts an angle
+
     def extract_hip_angle(self, landmarks):
-        """
-                Extracts the hip angle.
-
-                Parameters:
-                - landmarks: The list of pose landmarks from MediaPipe
-
-                Returns:
-                - An angle in degrees for the hip
-                """
-        # extract the x and y coordinates
         left_hip = [landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_HIP.value].x,
                     landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_HIP.value].y]
         left_shoulder = [landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_SHOULDER.value].x,
@@ -111,9 +81,9 @@ class Sense:
                      landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_KNEE.value].y]
         return self.calculate_angle(left_shoulder, left_hip, left_knee)
 
-    # Extracts the angle of the knee by measuring the angle between the left hip, left knee, and left ankle
+        # Extracts the angle of the knee
+
     def extract_knee_angle(self, landmarks):
-        # extract the x and y coordinates
         left_hip = [landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_HIP.value].x,
                     landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_HIP.value].y]
         left_knee = [landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_KNEE.value].x,
@@ -121,3 +91,60 @@ class Sense:
         left_ankle = [landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_ANKLE.value].x,
                       landmarks.landmark[mp.solutions.pose.PoseLandmark.LEFT_ANKLE.value].y]
         return self.calculate_angle(left_hip, left_knee, left_ankle)
+
+        # Function to extract hand coordinates (including fingers)
+
+    def extract_hand_coordinates(self, landmarks):
+        hand_coords = {
+            'wrist': [landmarks.landmark[mp.solutions.hands.HandLandmark.WRIST].x,
+                      landmarks.landmark[mp.solutions.hands.HandLandmark.WRIST].y],
+            'thumb_mcp': [landmarks.landmark[mp.solutions.hands.HandLandmark.THUMB_MCP].x,
+                          landmarks.landmark[mp.solutions.hands.HandLandmark.THUMB_MCP].y],
+            'thumb_tip': [landmarks.landmark[mp.solutions.hands.HandLandmark.THUMB_TIP].x,
+                          landmarks.landmark[mp.solutions.hands.HandLandmark.THUMB_TIP].y],
+            'index_mcp': [landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_MCP].x,
+                          landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_MCP].y],
+            'index_tip': [landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP].x,
+                          landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP].y],
+            # Add more fingers as needed
+        }
+        return hand_coords
+
+    # Function to calculate the angles for hand joints/fingers
+    def extract_hand_angles(self, landmarks):
+        wrist = [landmarks.landmark[mp.solutions.hands.HandLandmark.WRIST].x,
+                 landmarks.landmark[mp.solutions.hands.HandLandmark.WRIST].y]
+        thumb_mcp = [landmarks.landmark[mp.solutions.hands.HandLandmark.THUMB_MCP].x,
+                     landmarks.landmark[mp.solutions.hands.HandLandmark.THUMB_MCP].y]
+        thumb_tip = [landmarks.landmark[mp.solutions.hands.HandLandmark.THUMB_TIP].x,
+                     landmarks.landmark[mp.solutions.hands.HandLandmark.THUMB_TIP].y]
+        index_mcp = [landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_MCP].x,
+                     landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_MCP].y]
+        index_tip = [landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP].x,
+                     landmarks.landmark[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP].y]
+        middle_mcp = [landmarks.landmark[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_MCP].x,
+                      landmarks.landmark[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_MCP].y]
+        middle_tip = [landmarks.landmark[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_TIP].x,
+                      landmarks.landmark[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_TIP].y]
+        ring_mcp = [landmarks.landmark[mp.solutions.hands.HandLandmark.RING_FINGER_MCP].x,
+                    landmarks.landmark[mp.solutions.hands.HandLandmark.RING_FINGER_MCP].y]
+        ring_tip = [landmarks.landmark[mp.solutions.hands.HandLandmark.RING_FINGER_TIP].x,
+                    landmarks.landmark[mp.solutions.hands.HandLandmark.RING_FINGER_TIP].y]
+        pinky_mcp = [landmarks.landmark[mp.solutions.hands.HandLandmark.PINKY_MCP].x,
+                    landmarks.landmark[mp.solutions.hands.HandLandmark.PINKY_MCP].y]
+        pinky_tip = [landmarks.landmark[mp.solutions.hands.HandLandmark.PINKY_TIP].x,
+                    landmarks.landmark[mp.solutions.hands.HandLandmark.PINKY_TIP].y]
+
+        thumb_angle = self.calculate_angle(wrist, thumb_mcp, thumb_tip)
+        index_angle = self.calculate_angle(wrist, index_mcp, index_tip)
+        middle_angle = self.calculate_angle(wrist, middle_mcp, middle_tip)
+        ring_angle = self.calculate_angle(wrist, ring_mcp, ring_tip)
+        pinky_angle = self.calculate_angle(wrist, pinky_mcp, pinky_tip)
+
+        return {
+            'thumb_angle': thumb_angle,
+            'index_angle': index_angle,
+            'middle_angle': middle_angle,
+            'ring_angle': ring_angle,
+            'pinky_angle': pinky_angle
+        }
