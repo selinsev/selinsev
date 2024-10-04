@@ -1,8 +1,8 @@
 import cv2
 import mediapipe as mp
-from coach import Sense
-from coach import Think
-from coach import Act
+from sense_coach import Sense
+from sense_coach import Think
+from sense_coach import Act
 import numpy as np
 
 # Main Program Loop
@@ -78,5 +78,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
