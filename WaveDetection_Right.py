@@ -1,6 +1,6 @@
 import cv2
 import time
-from coach import HandTrackingModule as HTM
+import HandTrackingModule as HTM
 
 class WaveDetector:
     def __init__(self, max_positions=30, threshold=15):

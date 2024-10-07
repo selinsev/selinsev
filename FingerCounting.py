@@ -1,7 +1,7 @@
 import cv2
 import time
 import os
-from coach import HandTrackingModule as HTM
+import HandTrackingModule as HTM
 
 class FingerCounter:
 
@@ -82,7 +82,7 @@ class FingerCounter:
             value: The number of fingers open.
             frame: The current video frame.
         """
-        h, w, c = self.overlayList[value].shape
+        h, w, c = self.overlayList[value-1].shape
         frame[0:h, 0:w] = self.overlayList[value-1]
 
     def run(self):

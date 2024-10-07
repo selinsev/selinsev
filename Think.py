@@ -12,26 +12,22 @@ class Think:
             "Touch Thumb with Pinky": lambda movements: movements['thumb_to_pinky'],
             "Open All Fingers": lambda movements: all(movements[finger] for finger in ['index', 'middle', 'ring', 'pinky']),
             "Close All Fingers": lambda movements: not any(movements[finger] for finger in ['index', 'middle', 'ring', 'pinky']),
-            "Move Wrist (Fingers to the wrist)": lambda movements: movements['fingers_to_wrist']
         }
 
     def set_instruction(self, instruction):
-        """Set the current instruction (movement type)."""
+        """Set the current movement instruction."""
         self.current_instruction = instruction
 
     def update_state(self, hand_movements):
-        """Update the state based on the detected hand movements."""
-        if self.current_instruction in self.movement_expectations:
-            is_correct = self.movement_expectations[self.current_instruction](hand_movements)
-            self.state = "Correct" if is_correct else "Incorrect"
-        else:
-            self.state = "No Movement Instruction Given"
+        """Update the internal state based on the detected hand movements."""
+        self.state = "Correct" if self.decide_movement(hand_movements) else "Incorrect"
 
     def decide_movement(self, movements):
-        """Make a decision about the movement based on expectations."""
-        if self.current_instruction in self.movement_expectations:
+        """Check if the detected movement matches the current instruction."""
+        if self.current_instruction and self.current_instruction in self.movement_expectations:
             return self.movement_expectations[self.current_instruction](movements)
         return False
 
     def get_state(self):
+        """Retrieve the current state ('Correct' or 'Incorrect')."""
         return self.state

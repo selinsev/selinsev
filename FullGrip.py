@@ -1,7 +1,7 @@
 import cv2
 import time
 import math
-from coach import HandTrackingModule as HTM
+import HandTrackingModule as HTM
 
 class GripDetector:
     def __init__(self, thresholds=None):
